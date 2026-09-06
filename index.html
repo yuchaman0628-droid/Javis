@@ -151,6 +151,64 @@
       box-shadow: 0 0 25px #00f3ff;
     }
 
+    /* 画面内WEB表示用オーバーレイ */
+    .web-overlay {
+      position: absolute;
+      top: 5%;
+      left: 5%;
+      width: 90%;
+      height: 65%;
+      z-index: 10;
+      background: rgba(2, 8, 19, 0.95);
+      border: 2px solid #00f3ff;
+      border-radius: 12px;
+      box-shadow: 0 0 25px rgba(0, 243, 255, 0.5);
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .web-header {
+      height: 40px;
+      background: rgba(0, 243, 255, 0.15);
+      border-bottom: 1px solid #00f3ff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 15px;
+      color: #00f3ff;
+      font-weight: bold;
+      font-size: 0.9rem;
+      letter-spacing: 1px;
+    }
+
+    .close-btn {
+      background: transparent;
+      border: 1px solid #00f3ff;
+      color: #00f3ff;
+      border-radius: 50%;
+      width: 26px;
+      height: 26px;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+
+    .close-btn:hover {
+      background: #00f3ff;
+      color: #000;
+    }
+
+    .web-iframe {
+      width: 100%;
+      height: calc(100% - 40px);
+      border: none;
+      background: #fff;
+    }
+
     @keyframes rotateClockwise {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
@@ -179,6 +237,15 @@
     </div>
   </div>
 
+  <!-- 画面内WEB表示用オーバーレイ -->
+  <div class="web-overlay" id="webOverlay">
+    <div class="web-header">
+      <span>J.A.R.V.I.S. INFORMATION DISPLAY</span>
+      <button class="close-btn" id="closeWebBtn" onclick="closeInScreen()">×</button>
+    </div>
+    <iframe class="web-iframe" id="webIframe" src="about:blank"></iframe>
+  </div>
+
   <!-- 操作パネル -->
   <div class="ui-panel">
     <div class="subtitles" id="status">「音声起動」を押して「HEY JARVIS」と話しかけてください</div>
@@ -190,10 +257,13 @@
     const statusText = document.getElementById('status');
     const talkBtn = document.getElementById('talkBtn');
     const coreLight = document.getElementById('coreLight');
+    const webOverlay = document.getElementById('webOverlay');
+    const webIframe = document.getElementById('webIframe');
 
     let currentStream = null;
     let currentFacingMode = 'user';
     let isListening = false;
+    let isSpeaking = false; // 音声合成発言中フラグ
     let aiVisionModel = null;
 
     // 録画用変数
@@ -208,17 +278,31 @@
       return userName ? `${userName}様` : "サー";
     }
 
-    // デスクトップアクティブ通知の許可要求
+    // 画面上へのサイト表示機能
+    function openInScreen(url) {
+      webIframe.src = url;
+      webOverlay.style.display = 'flex';
+    }
+
+    function closeInScreen() {
+      webIframe.src = 'about:blank';
+      webOverlay.style.display = 'none';
+    }
+
+    // デスクトップアクティブ通知の許可要求（効果音・ピコン音無音化設定）
     if ("Notification" in window && Notification.permission !== "granted") {
       Notification.requestPermission();
     }
 
     function sendActiveNotification(msg) {
       if ("Notification" in window && Notification.permission === "granted") {
-        new Notification("J.A.R.V.I.S. System", {
-          body: msg,
-          icon: ""
-        });
+        try {
+          new Notification("J.A.R.V.I.S. System", {
+            body: msg,
+            icon: "",
+            silent: true // スマホ通知音の無音化
+          });
+        } catch (e) {}
       }
     }
 
@@ -253,7 +337,7 @@
       }
     }
 
-    // 2. 音声認識設定
+    // 2. 音声認識設定（スマホのピコンピコン音対策済み）
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (SpeechRecognition) {
@@ -274,8 +358,9 @@
         }
       });
 
+      // 音声認識終了時：自分が喋っていない場合のみマイク再開（ループ音防止）
       recognition.onend = () => {
-        if (isListening) {
+        if (isListening && !isSpeaking) {
           try { recognition.start(); } catch (e) {}
         }
       };
@@ -285,7 +370,7 @@
         const userSpeech = event.results[lastIndex][0].transcript.trim();
         statusText.innerText = `あなた: 「${userSpeech}」`;
         
-        processCommand(userSpeech);
+        processCommand(userSpeech, recognition);
       };
     } else {
       talkBtn.disabled = true;
@@ -415,13 +500,18 @@
       }
     }
 
-    // 3. 音声コマンド解析と実行（非同期処理対応）
-    async function processCommand(input) {
+    // 3. 音声コマンド解析と実行
+    async function processCommand(input, recognition) {
       const text = input.toLowerCase();
       let reply = "";
 
+      // 画面表示消去コマンド
+      if (text.includes("画面消") || text.includes("画面閉") || text.includes("閉じて") || text.includes("非表示")) {
+        closeInScreen();
+        reply = `画面表示を終了いたしました、${getTitle()}。`;
+      }
       // 「これ何？」画面画像AI解析コマンド
-      if (text.includes("これ何") || text.includes("これなに") || text.includes("これは何") || text.includes("映ってる") || text.includes("何が見える")) {
+      else if (text.includes("これ何") || text.includes("これなに") || text.includes("これは何") || text.includes("映ってる") || text.includes("何が見える")) {
         try {
           reply = await analyzeCurrentView();
           reply += `、${getTitle()}。`;
@@ -496,24 +586,24 @@
           reply = `リアルタイム天気の取得に失敗しました、${getTitle()}。`;
         }
       }
-      // 外部Webサイトへのアクセス・開き
+      // 外部Webサイトへのアクセス（画面上にインライン表示）
       else if (text.includes("開いて") || text.includes("アクセス")) {
         if (text.includes("youtube") || text.includes("ユーチューブ")) {
-          window.open("https://www.youtube.com", "_blank");
-          reply = `YouTube を開きました、${getTitle()}。`;
+          openInScreen("https://www.youtube.com");
+          reply = `YouTube を画面上に表示しました、${getTitle()}。`;
         } else if (text.includes("google") || text.includes("グーグル")) {
-          window.open("https://www.google.com", "_blank");
-          reply = `Google 検索を開きました、${getTitle()}。`;
+          openInScreen("https://www.google.com/search?igu=1");
+          reply = `Google 検索画面を表示しました、${getTitle()}。`;
         } else if (text.includes("ニュース")) {
-          window.open("https://news.google.com", "_blank");
-          reply = `最新ニュースサイトを開きました、${getTitle()}。`;
+          openInScreen("https://news.google.com");
+          reply = `最新ニュースを画面上に表示しました、${getTitle()}。`;
         } else {
           const target = text.replace(/(を開いて|にアクセスして|アクセス)/g, "").trim();
-          window.open(`https://www.google.com/search?q=${encodeURIComponent(target)}`, "_blank");
-          reply = `${target} へのアクセス用に検索結果を開きました、${getTitle()}。`;
+          openInScreen(`https://www.google.com/search?q=${encodeURIComponent(target)}&igu=1`);
+          reply = `${target} の検索結果を画面上に表示しました、${getTitle()}。`;
         }
       }
-      // 情報の引っ張り出し・検索（Wikipedia API / Web検索）
+      // 情報の引っ張り出し・検索（画面上にインライン表示）
       else if (text.includes("教えて") || text.includes("とは") || text.includes("調べて") || text.includes("検索")) {
         const query = text.replace(/(について教えて|とは|を調べて|で検索|を検索|教えて)/g, "").trim();
         if (query) {
@@ -523,15 +613,15 @@
             if (wikiRes.ok) {
               const wikiData = await wikiRes.json();
               const summary = wikiData.extract ? wikiData.extract.substring(0, 80) : "";
-              reply = `${query} について外部サイトから情報を取り出しました。${summary}... 画面にサイトを開きます、${getTitle()}。`;
-              window.open(wikiData.content_urls.desktop.page, "_blank");
+              reply = `${query} についての情報です。${summary}... 画面上に詳細ページを表示します、${getTitle()}。`;
+              openInScreen(wikiData.content_urls.desktop.page);
             } else {
-              window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, "_blank");
-              reply = `${query} についての外部WEBサイト検索結果を表示します、${getTitle()}。`;
+              openInScreen(`https://www.google.com/search?q=${encodeURIComponent(query)}&igu=1`);
+              reply = `${query} の検索結果を画面上に表示します、${getTitle()}。`;
             }
           } catch(e) {
-            window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, "_blank");
-            reply = `${query} について外部サイトを開いて調査を開始しました、${getTitle()}。`;
+            openInScreen(`https://www.google.com/search?q=${encodeURIComponent(query)}&igu=1`);
+            reply = `${query} についての検索ページを画面上に表示しました、${getTitle()}。`;
           }
         }
       }
@@ -575,13 +665,13 @@
         if (text.includes("こんにちは")) {
           reply = `こんにちは、${getTitle()}。何かお手伝いできることはありますか？`;
         } else if (text.includes("状況") || text.includes("報告")) {
-          reply = `システム正常。ビジョン認識・リアルタイムモニタリングを維持しています、${getTitle()}。`;
+          reply = `システム正常。リアルタイムモニタリングを維持しています、${getTitle()}。`;
         } else {
           reply = `はい、${getTitle()}。何でしょうか？`;
         }
       }
 
-      // 返答の実行・アクティブ通知
+      // 返答実行＆音声再生時のマイク制御（スマホ効果音完全防止）
       if (reply) {
         statusText.innerText = `J.A.R.V.I.S.: 「${reply}」`;
         sendActiveNotification(reply);
@@ -591,6 +681,30 @@
         utterance.lang = 'ja-JP';
         utterance.pitch = 0.85;
         utterance.rate = 1.0;
+
+        // 読み上げ開始時にマイク認識を一旦ストップ（ピコン音防止）
+        utterance.onstart = () => {
+          isSpeaking = true;
+          try { recognition.stop(); } catch(e) {}
+        };
+
+        // 読み上げ終了後にマイク認識を再開
+        utterance.onend = () => {
+          isSpeaking = false;
+          if (isListening) {
+            setTimeout(() => {
+              try { recognition.start(); } catch(e) {}
+            }, 300);
+          }
+        };
+
+        utterance.onerror = () => {
+          isSpeaking = false;
+          if (isListening) {
+            try { recognition.start(); } catch(e) {}
+          }
+        };
+
         window.speechSynthesis.speak(utterance);
       }
     }
