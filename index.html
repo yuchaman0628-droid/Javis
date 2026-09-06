@@ -164,8 +164,10 @@
 </head>
 <body>
 
+  <!-- カメラ映像 -->
   <video id="webcam" autoplay playsinline muted></video>
 
+  <!-- HUDリング -->
   <div class="hud-overlay">
     <div class="jarvis-container">
       <div class="outer-ring"></div>
@@ -174,6 +176,7 @@
     </div>
   </div>
 
+  <!-- 操作パネル -->
   <div class="ui-panel">
     <div class="subtitles" id="status">「音声起動」を押して「HEY JARVIS」と話しかけてください</div>
     <button class="btn-talk" id="talkBtn">音声起動</button>
@@ -186,10 +189,31 @@
     const coreLight = document.getElementById('coreLight');
 
     let currentStream = null;
-    let currentFacingMode = 'user'; // 'user'=インカメ, 'environment'=アウトカメラ
+    let currentFacingMode = 'user';
     let isListening = false;
 
-    // 1. Webカメラ起動（イン・アウト制御付き）
+    // ユーザー名の読み込み（localStorage）
+    let userName = localStorage.getItem('jarvis_userName') || "";
+
+    function getTitle() {
+      return userName ? `${userName}様` : "サー";
+    }
+
+    // デスクトップアクティブ通知の許可要求
+    if ("Notification" in window && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+
+    function sendActiveNotification(msg) {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("J.A.R.V.I.S. System", {
+          body: msg,
+          icon: ""
+        });
+      }
+    }
+
+    // 1. Webカメラ起動
     async function initCamera(facingMode = 'user') {
       if (currentStream) {
         currentStream.getTracks().forEach(track => track.stop());
@@ -200,24 +224,23 @@
         video.srcObject = currentStream;
         currentFacingMode = facingMode;
         
-        // インカメのみ左右反転
         if (facingMode === 'user') {
           video.style.transform = 'scaleX(-1)';
         } else {
           video.style.transform = 'scaleX(1)';
         }
       } catch (err) {
-        statusText.innerText = "カメラの切り替えに失敗しました。";
+        statusText.innerText = "カメラのアクセスまたは切り替えに失敗しました。";
       }
     }
 
-    // 2. 常時聞き取り音声認識 & 応答
+    // 2. 音声認識設定
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
       recognition.lang = 'ja-JP';
-      recognition.continuous = true; // 常時聞き取りを有効化
+      recognition.continuous = true;
       recognition.interimResults = false;
 
       talkBtn.addEventListener('click', () => {
@@ -226,12 +249,12 @@
             recognition.start();
             isListening = true;
             talkBtn.innerText = "システム待機中...";
-            statusText.innerText = "「HEY JARVIS」と呼んで指示を出してください";
+            const greeting = userName ? `お帰りなさいませ、${userName}様。「HEY JARVIS」とお呼びください。` : "「HEY JARVIS」と呼んで指示を出してください";
+            statusText.innerText = greeting;
           } catch (e) {}
         }
       });
 
-      // 認識が切れたら自動再起動してウェイクワード待機を維持
       recognition.onend = () => {
         if (isListening) {
           try { recognition.start(); } catch (e) {}
@@ -250,61 +273,160 @@
       statusText.innerText = "お使いのブラウザは音声認識に対応していません（Google Chrome推奨）。";
     }
 
-    // 3. 音声コマンド解析と実行
-    function processCommand(input) {
+    // 天気コードを日本語化する関数
+    function parseWeatherCode(code) {
+      if (code === 0) return "快晴";
+      if (code <= 3) return "晴れ時々曇り";
+      if (code <= 48) return "霧";
+      if (code <= 67) return "雨";
+      if (code <= 77) return "雪";
+      if (code <= 82) return "大雨";
+      return "荒天";
+    }
+
+    // 3. 音声コマンド解析と実行（非同期処理対応）
+    async function processCommand(input) {
       const text = input.toLowerCase();
       let reply = "";
 
+      // 名前の記憶登録機能
+      if (text.includes("名前は") || text.includes("呼んで")) {
+        let nameMatch = text.match(/(?:名前は|と呼んで|呼んで)(.+?)(?:だよ|です|にして|でお願い|$)/);
+        if (!nameMatch) {
+          nameMatch = text.match(/僕の名前は(.+)/) || text.match(/(.+)と呼んで/);
+        }
+        if (nameMatch && nameMatch[1]) {
+          const extractedName = nameMatch[1].replace(/僕の|私の|は|と/g, '').trim();
+          if (extractedName) {
+            userName = extractedName;
+            localStorage.setItem('jarvis_userName', userName);
+            reply = `承知いたしました。お名前を「${userName}」として登録いたしました。これよりは${userName}様とお呼びいたします。`;
+          }
+        }
+        if (!reply) {
+          reply = `お名前の確認ができませんでした。もう一度「僕の名前は〇〇だよ」とおっしゃってください。`;
+        }
+      }
+      // バッテリー残量の確認
+      else if (text.includes("充電") || text.includes("バッテリー") || text.includes("電池")) {
+        if ('getBattery' in navigator) {
+          try {
+            const battery = await navigator.getBattery();
+            const level = Math.round(battery.level * 100);
+            const status = battery.charging ? "現在充電中です。" : "現在バッテリー駆動中です。";
+            reply = `現在のデバイスのバッテリー残量は ${level}% です。${status}`;
+          } catch (e) {
+            reply = `バッテリー情報の取得に失敗しました、${getTitle()}。`;
+          }
+        } else {
+          reply = `お使いのブラウザはバッテリー情報の取得に対応していません、${getTitle()}。`;
+        }
+      }
+      // リアルタイム天気情報（Open-Meteo API使用）
+      else if (text.includes("天気") || text.includes("予報")) {
+        try {
+          statusText.innerText = "リアルタイム天気を取得中...";
+          // デフォルト座標（東京）
+          const response = await fetch("https://api.open-meteo.com/v1/forecast?latitude=35.6895&longitude=139.6917&current_weather=true");
+          const data = await response.json();
+          const temp = Math.round(data.current_weather.temperature);
+          const condition = parseWeatherCode(data.current_weather.weathercode);
+          reply = `現在の気温は ${temp} 度、天気は ${condition} です、${getTitle()}。`;
+        } catch (e) {
+          reply = `リアルタイム天気の取得に失敗しました、${getTitle()}。`;
+        }
+      }
+      // 外部Webサイトへのアクセス・開き
+      else if (text.includes("開いて") || text.includes("アクセス")) {
+        if (text.includes("youtube") || text.includes("ユーチューブ")) {
+          window.open("https://www.youtube.com", "_blank");
+          reply = `YouTube を開きました、${getTitle()}。`;
+        } else if (text.includes("google") || text.includes("グーグル")) {
+          window.open("https://www.google.com", "_blank");
+          reply = `Google 検索を開きました、${getTitle()}。`;
+        } else if (text.includes("ニュース")) {
+          window.open("https://news.google.com", "_blank");
+          reply = `最新ニュースサイトを開きました、${getTitle()}。`;
+        } else {
+          const target = text.replace(/(を開いて|にアクセスして|アクセス)/g, "").trim();
+          window.open(`https://www.google.com/search?q=${encodeURIComponent(target)}`, "_blank");
+          reply = `${target} へのアクセス用に検索結果を開きました、${getTitle()}。`;
+        }
+      }
+      // 情報の引っ張り出し・検索（Wikipedia API / Web検索）
+      else if (text.includes("教えて") || text.includes("とは") || text.includes("調べて") || text.includes("検索")) {
+        const query = text.replace(/(について教えて|とは|を調べて|で検索|を検索|教えて)/g, "").trim();
+        if (query) {
+          try {
+            statusText.innerText = `外部データベースから「${query}」を検索中...`;
+            const wikiRes = await fetch(`https://ja.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`);
+            if (wikiRes.ok) {
+              const wikiData = await wikiRes.json();
+              const summary = wikiData.extract ? wikiData.extract.substring(0, 80) : "";
+              reply = `${query} について外部サイトから情報を取り出しました。${summary}... 画面にサイトを開きます、${getTitle()}。`;
+              window.open(wikiData.content_urls.desktop.page, "_blank");
+            } else {
+              window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, "_blank");
+              reply = `${query} についての外部WEBサイト検索結果を表示します、${getTitle()}。`;
+            }
+          } catch(e) {
+            window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, "_blank");
+            reply = `${query} について外部サイトを開いて調査を開始しました、${getTitle()}。`;
+          }
+        }
+      }
       // 時間の問い合わせ
-      if (text.includes("時間") || text.includes("今何時") || text.includes("時刻")) {
+      else if (text.includes("時間") || text.includes("今何時") || text.includes("時刻")) {
         const now = new Date();
-        reply = `現在は${now.getHours()}時${now.getMinutes()}分です、サー。`;
+        reply = `現在は${now.getHours()}時${now.getMinutes()}分です、${getTitle()}。`;
       } 
       // 日付の問い合わせ
       else if (text.includes("日") || text.includes("今日") || text.includes("日付") || text.includes("カレンダー")) {
         const now = new Date();
         const days = ["日", "月", "火", "水", "木", "金", "土"];
-        reply = `本日は${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日、${days[now.getDay()]}曜日です、サー。`;
+        reply = `本日は${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日、${days[now.getDay()]}曜日です、${getTitle()}。`;
       } 
       // カメラ切替操作
       else if (text.includes("カメラ")) {
         if (text.includes("イン") || text.includes("内") || text.includes("前")) {
           initCamera('user');
-          reply = "インカメラに切り替えました、サー。";
+          reply = `インカメラに切り替えました、${getTitle()}。`;
         } else if (text.includes("アウト") || text.includes("外") || text.includes("リア") || text.includes("後ろ")) {
           initCamera('environment');
-          reply = "アウトカメラに切り替えました、サー。";
+          reply = `アウトカメラに切り替えました、${getTitle()}。`;
         } else {
           const nextMode = currentFacingMode === 'user' ? 'environment' : 'user';
           initCamera(nextMode);
-          reply = nextMode === 'user' ? "インカメラに切り替えました、サー。" : "アウトカメラに切り替えました、サー。";
+          reply = nextMode === 'user' ? `インカメラに切り替えました、${getTitle()}。` : `アウトカメラに切り替えました、${getTitle()}。`;
         }
       } 
       // 中央の光（コア）制御
       else if (text.includes("光") || text.includes("ライト") || text.includes("電気") || text.includes("コア")) {
         if (text.includes("消") || text.includes("オフ") || text.includes("切")) {
           coreLight.classList.add('off');
-          reply = "中央コアの発光を停止しました、サー。";
+          reply = `中央コアの発光を停止しました、${getTitle()}。`;
         } else if (text.includes("つけ") || text.includes("オン") || text.includes("点")) {
           coreLight.classList.remove('off');
-          reply = "中央コアの発光を再開しました、サー。";
+          reply = `中央コアの発光を再開しました、${getTitle()}。`;
         }
       } 
       // ウェイクワードまたは一般的な応答
       else if (text.includes("ヘイ") || text.includes("hey") || text.includes("ジャービス") || text.includes("javis") || text.includes("jarvis")) {
         if (text.includes("こんにちは")) {
-          reply = "こんにちは、サー。何かお手伝いできることはありますか？";
+          reply = `こんにちは、${getTitle()}。何かお手伝いできることはありますか？`;
         } else if (text.includes("状況") || text.includes("報告")) {
-          reply = "システム正常。周辺のリアルタイムモニタリングを維持しています。";
+          reply = `システム正常。リアルタイムモニタリングを維持しています、${getTitle()}。`;
         } else {
-          reply = "はい、サー。何でしょうか？";
+          reply = `はい、${getTitle()}。何でしょうか？`;
         }
       }
 
-      // 返答の実行
+      // 返答の実行・アクティブ通知
       if (reply) {
         statusText.innerText = `J.A.R.V.I.S.: 「${reply}」`;
-        window.speechSynthesis.cancel(); // 直前の音声をカットして即応
+        sendActiveNotification(reply); // アクティブデスクトップ通知を発信
+
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(reply);
         utterance.lang = 'ja-JP';
         utterance.pitch = 0.85;
