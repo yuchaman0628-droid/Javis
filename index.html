@@ -87,6 +87,14 @@
       border-radius: 50%;
       box-shadow: 0 0 30px #00f3ff;
       animation: pulse 2s ease-in-out infinite;
+      transition: opacity 0.5s ease;
+    }
+
+    /* 光消去用クラス */
+    .core.off {
+      opacity: 0 !important;
+      box-shadow: none !important;
+      background: transparent !important;
     }
 
     /* UI操作エリア */
@@ -162,12 +170,12 @@
     <div class="jarvis-container">
       <div class="outer-ring"></div>
       <div class="inner-ring"></div>
-      <div class="core"></div>
+      <div class="core" id="coreLight"></div>
     </div>
   </div>
 
   <div class="ui-panel">
-    <div class="subtitles" id="status">「音声起動」ボタンを押して話しかけてください</div>
+    <div class="subtitles" id="status">「音声起動」を押して「HEY JARVIS」と話しかけてください</div>
     <button class="btn-talk" id="talkBtn">音声起動</button>
   </div>
 
@@ -175,76 +183,137 @@
     const video = document.getElementById('webcam');
     const statusText = document.getElementById('status');
     const talkBtn = document.getElementById('talkBtn');
+    const coreLight = document.getElementById('coreLight');
 
-    // 1. Webカメラ起動
-    async function initCamera() {
+    let currentStream = null;
+    let currentFacingMode = 'user'; // 'user'=インカメ, 'environment'=アウトカメラ
+    let isListening = false;
+
+    // 1. Webカメラ起動（イン・アウト制御付き）
+    async function initCamera(facingMode = 'user') {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        video.srcObject = stream;
+        const constraints = { video: { facingMode: facingMode }, audio: false };
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+        currentFacingMode = facingMode;
+        
+        // インカメのみ左右反転
+        if (facingMode === 'user') {
+          video.style.transform = 'scaleX(-1)';
+        } else {
+          video.style.transform = 'scaleX(1)';
+        }
       } catch (err) {
-        statusText.innerText = "カメラのアクセスを許可してください。";
+        statusText.innerText = "カメラの切り替えに失敗しました。";
       }
     }
 
-    // 2. 音声認識 & 応答
+    // 2. 常時聞き取り音声認識 & 応答
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
       recognition.lang = 'ja-JP';
+      recognition.continuous = true; // 常時聞き取りを有効化
       recognition.interimResults = false;
 
       talkBtn.addEventListener('click', () => {
-        try {
-          recognition.start();
-          statusText.innerText = "音声を入力中...";
-        } catch (e) {
-          // 既に起動中の場合
+        if (!isListening) {
+          try {
+            recognition.start();
+            isListening = true;
+            talkBtn.innerText = "システム待機中...";
+            statusText.innerText = "「HEY JARVIS」と呼んで指示を出してください";
+          } catch (e) {}
         }
       });
 
-      recognition.onresult = (event) => {
-        const userSpeech = event.results[0][0].transcript;
-        statusText.innerText = `あなた: 「${userSpeech}」`;
-        
-        setTimeout(() => {
-          respondJarvis(userSpeech);
-        }, 500);
+      // 認識が切れたら自動再起動してウェイクワード待機を維持
+      recognition.onend = () => {
+        if (isListening) {
+          try { recognition.start(); } catch (e) {}
+        }
       };
 
-      recognition.onerror = () => {
-        statusText.innerText = "音声を認識できませんでした。もう一度試してください。";
+      recognition.onresult = (event) => {
+        const lastIndex = event.results.length - 1;
+        const userSpeech = event.results[lastIndex][0].transcript.trim();
+        statusText.innerText = `あなた: 「${userSpeech}」`;
+        
+        processCommand(userSpeech);
       };
     } else {
       talkBtn.disabled = true;
       statusText.innerText = "お使いのブラウザは音声認識に対応していません（Google Chrome推奨）。";
     }
 
-    // 3. J.A.R.V.I.S. 応答・音声合成（読み上げ）
-    function respondJarvis(input) {
-      let reply = "承知いたしました、サー。";
+    // 3. 音声コマンド解析と実行
+    function processCommand(input) {
+      const text = input.toLowerCase();
+      let reply = "";
 
-      if (input.includes("こんにちは") || input.includes("ジャービス")) {
-        reply = "こんにちは、サー。システムはすべて正常に作動しています。";
-      } else if (input.includes("状況") || input.includes("報告") || input.includes("視界")) {
-        reply = "フロントカメラ正常。周辺環境のアナライズを維持しています。";
-      } else if (input.includes("誰")) {
-        reply = "私はJ.A.R.V.I.S.、あなたのAIアシスタントです。";
-      } else if (input.includes("ありがとう")) {
-        reply = "どういたしまして、サー。いつでもお申し付けください。";
+      // 時間の問い合わせ
+      if (text.includes("時間") || text.includes("今何時") || text.includes("時刻")) {
+        const now = new Date();
+        reply = `現在は${now.getHours()}時${now.getMinutes()}分です、サー。`;
+      } 
+      // 日付の問い合わせ
+      else if (text.includes("日") || text.includes("今日") || text.includes("日付") || text.includes("カレンダー")) {
+        const now = new Date();
+        const days = ["日", "月", "火", "水", "木", "金", "土"];
+        reply = `本日は${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日、${days[now.getDay()]}曜日です、サー。`;
+      } 
+      // カメラ切替操作
+      else if (text.includes("カメラ")) {
+        if (text.includes("イン") || text.includes("内") || text.includes("前")) {
+          initCamera('user');
+          reply = "インカメラに切り替えました、サー。";
+        } else if (text.includes("アウト") || text.includes("外") || text.includes("リア") || text.includes("後ろ")) {
+          initCamera('environment');
+          reply = "アウトカメラに切り替えました、サー。";
+        } else {
+          const nextMode = currentFacingMode === 'user' ? 'environment' : 'user';
+          initCamera(nextMode);
+          reply = nextMode === 'user' ? "インカメラに切り替えました、サー。" : "アウトカメラに切り替えました、サー。";
+        }
+      } 
+      // 中央の光（コア）制御
+      else if (text.includes("光") || text.includes("ライト") || text.includes("電気") || text.includes("コア")) {
+        if (text.includes("消") || text.includes("オフ") || text.includes("切")) {
+          coreLight.classList.add('off');
+          reply = "中央コアの発光を停止しました、サー。";
+        } else if (text.includes("つけ") || text.includes("オン") || text.includes("点")) {
+          coreLight.classList.remove('off');
+          reply = "中央コアの発光を再開しました、サー。";
+        }
+      } 
+      // ウェイクワードまたは一般的な応答
+      else if (text.includes("ヘイ") || text.includes("hey") || text.includes("ジャービス") || text.includes("javis") || text.includes("jarvis")) {
+        if (text.includes("こんにちは")) {
+          reply = "こんにちは、サー。何かお手伝いできることはありますか？";
+        } else if (text.includes("状況") || text.includes("報告")) {
+          reply = "システム正常。周辺のリアルタイムモニタリングを維持しています。";
+        } else {
+          reply = "はい、サー。何でしょうか？";
+        }
       }
 
-      statusText.innerText = `J.A.R.V.I.S.: 「${reply}」`;
-
-      // 音声読み上げ
-      const utterance = new SpeechSynthesisUtterance(reply);
-      utterance.lang = 'ja-JP';
-      utterance.pitch = 0.85; // 少し低めのトーン
-      utterance.rate = 1.0;
-      window.speechSynthesis.speak(utterance);
+      // 返答の実行
+      if (reply) {
+        statusText.innerText = `J.A.R.V.I.S.: 「${reply}」`;
+        window.speechSynthesis.cancel(); // 直前の音声をカットして即応
+        const utterance = new SpeechSynthesisUtterance(reply);
+        utterance.lang = 'ja-JP';
+        utterance.pitch = 0.85;
+        utterance.rate = 1.0;
+        window.speechSynthesis.speak(utterance);
+      }
     }
 
-    initCamera();
+    initCamera('user');
   </script>
 </body>
 </html>
