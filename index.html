@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>J.A.R.V.I.S. Interactive HUD</title>
+  <title>J.A.R.V.I.S. Interactive HUD System</title>
   <!-- AI視覚認識エンジン (TensorFlow.js & MobileNet) -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
@@ -23,6 +23,75 @@
       color: #00f3ff;
     }
 
+    /* タイトル画面（デバイス選択画面） */
+    .title-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle, #020d1a 0%, #000000 100%);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 25px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .title-header h1 {
+      font-size: 2.2rem;
+      letter-spacing: 4px;
+      text-shadow: 0 0 15px #00f3ff;
+      margin-bottom: 8px;
+    }
+
+    .title-header p {
+      font-size: 0.95rem;
+      color: rgba(0, 243, 255, 0.7);
+      letter-spacing: 1px;
+    }
+
+    .device-buttons {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 500px;
+    }
+
+    .btn-device {
+      background: rgba(0, 243, 255, 0.1);
+      border: 2px solid #00f3ff;
+      color: #00f3ff;
+      padding: 15px 30px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      letter-spacing: 2px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+      min-width: 130px;
+    }
+
+    .btn-device:hover {
+      background: #00f3ff;
+      color: #000;
+      box-shadow: 0 0 25px #00f3ff;
+    }
+
+    .title-voice-hint {
+      font-size: 0.9rem;
+      color: #00f3ff;
+      border: 1px dashed #00f3ff;
+      padding: 8px 16px;
+      border-radius: 20px;
+      background: rgba(0, 243, 255, 0.05);
+    }
+
     /* Webカメラ映像（背景） */
     #webcam {
       position: absolute;
@@ -33,7 +102,7 @@
       object-fit: cover;
       z-index: 1;
       filter: brightness(0.6) contrast(1.2);
-      transform: scaleX(-1); /* 鏡像反転 */
+      transform: scaleX(-1);
     }
 
     /* HUDオーバーレイ */
@@ -51,7 +120,6 @@
       pointer-events: none;
     }
 
-    /* ホログラムリング */
     .jarvis-container {
       position: relative;
       width: 320px;
@@ -93,7 +161,7 @@
       transition: opacity 0.5s ease;
     }
 
-    /* 初期状態で中央の光を消灯 */
+    /* 初期状態：中央の光を消灯 */
     .core.off {
       opacity: 0 !important;
       box-shadow: none !important;
@@ -103,16 +171,16 @@
     /* UI操作エリア */
     .ui-panel {
       position: absolute;
-      bottom: 30px;
+      bottom: 25px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 3;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       width: 90%;
-      max-width: 600px;
+      max-width: 650px;
     }
 
     .subtitles {
@@ -122,7 +190,7 @@
       padding: 12px 20px;
       width: 100%;
       text-align: center;
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       min-height: 55px;
       display: flex;
       align-items: center;
@@ -133,30 +201,32 @@
 
     .btn-group {
       display: flex;
-      gap: 10px;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
     }
 
     .btn-talk, .btn-sub {
       background: rgba(0, 243, 255, 0.15);
       border: 2px solid #00f3ff;
       color: #00f3ff;
-      padding: 10px 24px;
-      font-size: 0.95rem;
+      padding: 8px 18px;
+      font-size: 0.9rem;
       font-weight: bold;
-      letter-spacing: 1.5px;
-      border-radius: 25px;
+      letter-spacing: 1.2px;
+      border-radius: 20px;
       cursor: pointer;
       transition: all 0.3s ease;
-      box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+      box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
     }
 
     .btn-talk:hover, .btn-sub:hover {
       background: #00f3ff;
       color: #020813;
-      box-shadow: 0 0 25px #00f3ff;
+      box-shadow: 0 0 20px #00f3ff;
     }
 
-    /* 画面内WEB表示用オーバーレイ */
+    /* 画面内オーバーレイ（WEB表示＆ファイル表示兼用） */
     .web-overlay {
       position: absolute;
       top: 5%;
@@ -183,7 +253,7 @@
       padding: 0 15px;
       color: #00f3ff;
       font-weight: bold;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       letter-spacing: 1px;
     }
 
@@ -207,11 +277,39 @@
       color: #000;
     }
 
-    .web-iframe {
+    .web-iframe, .file-viewer {
       width: 100%;
       height: calc(100% - 40px);
       border: none;
       background: #fff;
+    }
+
+    .file-viewer {
+      background: #05101a;
+      color: #00f3ff;
+      padding: 15px;
+      overflow: auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .file-viewer img, .file-viewer video {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+
+    .file-viewer pre {
+      white-space: pre-wrap;
+      word-break: break-all;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 非表示ファイルインプット */
+    #fileInput {
+      display: none;
     }
 
     @keyframes rotateClockwise {
@@ -230,7 +328,23 @@
 </head>
 <body>
 
-  <!-- カメラ映像 -->
+  <!-- タイトル画面（デバイス選択） -->
+  <div class="title-screen" id="titleScreen">
+    <div class="title-header">
+      <h1>J.A.R.V.I.S. SYSTEM</h1>
+      <p>SELECT YOUR INITIAL DEVICE INTERFACE</p>
+    </div>
+    <div class="device-buttons">
+      <button class="btn-device" onclick="selectDevice('スマホ')">スマホ</button>
+      <button class="btn-device" onclick="selectDevice('タブレット')">タブレット</button>
+      <button class="btn-device" onclick="selectDevice('PC')">PC</button>
+    </div>
+    <div class="title-voice-hint">
+      🎙️ 音声コマンド待機中: 「スマホ」「タブレット」「PC」と話しかけて起動可能
+    </div>
+  </div>
+
+  <!-- Webカメラ映像 -->
   <video id="webcam" autoplay playsinline muted></video>
 
   <!-- HUDリング (コアの光は初期状態 off) -->
@@ -242,48 +356,60 @@
     </div>
   </div>
 
-  <!-- 画面内WEB表示用オーバーレイ -->
+  <!-- 画面内WEB＆ファイル表示用オーバーレイ -->
   <div class="web-overlay" id="webOverlay">
     <div class="web-header">
-      <span>J.A.R.V.I.S. INFORMATION DISPLAY</span>
-      <button class="close-btn" id="closeWebBtn" onclick="closeInScreen()">×</button>
+      <span id="overlayTitle">J.A.R.V.I.S. INFORMATION DISPLAY</span>
+      <button class="close-btn" onclick="closeInScreen()">×</button>
     </div>
     <iframe class="web-iframe" id="webIframe" src="about:blank"></iframe>
+    <div class="file-viewer" id="fileViewer" style="display: none;"></div>
   </div>
+
+  <!-- ファイル選択用非表示インプット -->
+  <input type="file" id="fileInput" onchange="handleFileSelect(event)">
 
   <!-- 操作パネル -->
   <div class="ui-panel">
     <div class="subtitles" id="status">「音声起動」を押して「HEY JARVIS」と話しかけてください</div>
     <div class="btn-group">
       <button class="btn-talk" id="talkBtn">音声起動</button>
-      <button class="btn-sub" id="voiceBtn" onclick="switchVoice()">音声変更</button>
+      <button class="btn-sub" onclick="triggerFileInput()">ファイル選択</button>
+      <button class="btn-sub" onclick="switchVoice()">音声変更</button>
     </div>
   </div>
 
   <script>
+    const titleScreen = document.getElementById('titleScreen');
     const video = document.getElementById('webcam');
     const statusText = document.getElementById('status');
     const talkBtn = document.getElementById('talkBtn');
     const coreLight = document.getElementById('coreLight');
     const webOverlay = document.getElementById('webOverlay');
     const webIframe = document.getElementById('webIframe');
+    const fileViewer = document.getElementById('fileViewer');
+    const overlayTitle = document.getElementById('overlayTitle');
+    const fileInput = document.getElementById('fileInput');
 
+    let selectedDeviceType = "PC";
     let currentStream = null;
     let currentFacingMode = 'user';
     let isListening = false;
     let isSpeaking = false;
+    let recognition = null;
+    let restartTimer = null;
     let aiVisionModel = null;
     let isTorchOn = false;
 
-    // 録画用変数
+    // 録画用
     let mediaRecorder = null;
     let recordedChunks = [];
     let isRecording = false;
 
-    // ユーザー名の読み込み（localStorage）
+    // ユーザー名
     let userName = localStorage.getItem('jarvis_userName') || "";
 
-    // 音声選択＆設定用変数
+    // 音声設定
     let availableVoices = [];
     let currentVoiceIndex = 0;
     let speechPitch = 0.85;
@@ -292,7 +418,7 @@
       return userName ? `${userName}様` : "サー";
     }
 
-    // 音声リストの読み込み
+    // 音声リスト読み込み
     function initVoices() {
       if ('speechSynthesis' in window) {
         availableVoices = window.speechSynthesis.getVoices().filter(v => v.lang.includes('ja') || v.lang.includes('JP'));
@@ -306,18 +432,30 @@
       speechSynthesis.onvoiceschanged = initVoices;
     }
 
-    // 音声切り替え機能
+    // 音声切り替え
     function switchVoice() {
       if (availableVoices.length > 0) {
         currentVoiceIndex = (currentVoiceIndex + 1) % availableVoices.length;
         const voiceName = availableVoices[currentVoiceIndex].name;
         speakResponse(`音声を「${voiceName}」に変更いたしました、${getTitle()}。`);
       } else {
-        speakResponse(`利用可能な音声エンジンが1つのみのため、音声を変更できません。`);
+        speakResponse(`利用可能な音声エンジンが1つのみのため変更できません。`);
       }
     }
 
-    // スマホライト（フラッシュライト）制御機能
+    // デバイス選択処理（画面タップ・音声共通）
+    function selectDevice(deviceType) {
+      selectedDeviceType = deviceType;
+      titleScreen.style.display = 'none';
+      
+      const defaultCamera = (deviceType === 'スマホ') ? 'environment' : 'user';
+      initCamera(defaultCamera);
+
+      const msg = `${deviceType}モードでシステムを初期化いたしました。お帰りなさいませ、${getTitle()}。「HEY JARVIS」とお呼びください。`;
+      speakResponse(msg);
+    }
+
+    // スマホライト制御
     async function setTorch(enable) {
       if (!currentStream) return false;
       const track = currentStream.getVideoTracks()[0];
@@ -326,9 +464,7 @@
       try {
         const capabilities = track.getCapabilities();
         if (capabilities.torch) {
-          await track.applyConstraints({
-            advanced: [{ torch: enable }]
-          });
+          await track.applyConstraints({ advanced: [{ torch: enable }] });
           isTorchOn = enable;
           return true;
         }
@@ -336,18 +472,68 @@
       return false;
     }
 
-    // 画面上へのサイト表示機能
+    // 画面内表示・消去
     function openInScreen(url) {
+      fileViewer.style.display = 'none';
+      webIframe.style.display = 'block';
       webIframe.src = url;
+      overlayTitle.innerText = "J.A.R.V.I.S. INFORMATION DISPLAY";
       webOverlay.style.display = 'flex';
     }
 
     function closeInScreen() {
       webIframe.src = 'about:blank';
+      fileViewer.innerHTML = '';
       webOverlay.style.display = 'none';
     }
 
-    // デスクトップアクティブ通知（無音化）
+    // ファイル閲覧機能
+    function triggerFileInput() {
+      fileInput.click();
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      fileViewer.innerHTML = '';
+      webIframe.style.display = 'none';
+      fileViewer.style.display = 'flex';
+      overlayTitle.innerText = `FILE: ${file.name}`;
+
+      const fileURL = URL.createObjectURL(file);
+
+      if (file.type.startsWith('image/')) {
+        const img = document.createElement('img');
+        img.src = fileURL;
+        fileViewer.appendChild(img);
+      } else if (file.type.startsWith('video/')) {
+        const videoElem = document.createElement('video');
+        videoElem.src = fileURL;
+        videoElem.controls = true;
+        videoElem.autoplay = true;
+        fileViewer.appendChild(videoElem);
+      } else if (file.type.startsWith('text/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const pre = document.createElement('pre');
+          pre.textContent = e.target.result;
+          fileViewer.appendChild(pre);
+        };
+        reader.readAsText(file);
+      } else {
+        const iframe = document.createElement('iframe');
+        iframe.src = fileURL;
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        fileViewer.appendChild(iframe);
+      }
+
+      webOverlay.style.display = 'flex';
+      speakResponse(`ファイル「${file.name}」を画面上に展開いたしました、${getTitle()}。`);
+    }
+
+    // 通知（無音化）
     if ("Notification" in window && Notification.permission !== "granted") {
       Notification.requestPermission();
     }
@@ -355,19 +541,14 @@
     function sendActiveNotification(msg) {
       if ("Notification" in window && Notification.permission === "granted") {
         try {
-          new Notification("J.A.R.V.I.S. System", {
-            body: msg,
-            silent: true
-          });
+          new Notification("J.A.R.V.I.S. System", { body: msg, silent: true });
         } catch (e) {}
       }
     }
 
     // AI視覚モデルロード
     async function loadAIVision() {
-      try {
-        aiVisionModel = await mobilenet.load();
-      } catch (e) {}
+      try { aiVisionModel = await mobilenet.load(); } catch (e) {}
     }
     loadAIVision();
 
@@ -382,54 +563,69 @@
         video.srcObject = currentStream;
         currentFacingMode = facingMode;
         
-        if (facingMode === 'user') {
-          video.style.transform = 'scaleX(-1)';
-        } else {
-          video.style.transform = 'scaleX(1)';
-        }
+        video.style.transform = (facingMode === 'user') ? 'scaleX(-1)' : 'scaleX(1)';
       } catch (err) {
         statusText.innerText = "カメラのアクセスまたは切り替えに失敗しました。";
       }
     }
 
-    // 2. 音声認識設定
+    // 2. 音声認識（ピコン音防止・自動復旧型）
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
+      recognition = new SpeechRecognition();
       recognition.lang = 'ja-JP';
       recognition.continuous = true;
       recognition.interimResults = false;
 
+      function startListeningSafely() {
+        if (!isListening) return;
+        clearTimeout(restartTimer);
+        restartTimer = setTimeout(() => {
+          if (!isSpeaking) {
+            try { recognition.start(); } catch (e) {}
+          }
+        }, 400); // 連続再起動を防止してピコン音解消
+      }
+
       talkBtn.addEventListener('click', () => {
         if (!isListening) {
-          try {
-            recognition.start();
-            isListening = true;
-            talkBtn.innerText = "システム待機中...";
-            const greeting = userName ? `お帰りなさいませ、${userName}様。「HEY JARVIS」とお呼びください。` : "「HEY JARVIS」と呼んで指示を出してください";
-            statusText.innerText = greeting;
-          } catch (e) {}
+          isListening = true;
+          talkBtn.innerText = "システム待機中...";
+          statusText.innerText = "音声認識を起動しました。「HEY JARVIS」とお呼びください。";
+          startListeningSafely();
         }
       });
 
       recognition.onend = () => {
         if (isListening && !isSpeaking) {
-          try { recognition.start(); } catch (e) {}
+          startListeningSafely();
+        }
+      };
+
+      recognition.onerror = (e) => {
+        if (isListening && !isSpeaking) {
+          startListeningSafely();
         }
       };
 
       recognition.onresult = (event) => {
         const lastIndex = event.results.length - 1;
         const userSpeech = event.results[lastIndex][0].transcript.trim();
-        processCommand(userSpeech, recognition);
+        processCommand(userSpeech);
       };
+
+      // 起動直後から音声認識をバックグラウンド待機（タイトル画面での音声選択用）
+      try {
+        isListening = true;
+        recognition.start();
+      } catch(e) {}
     } else {
       talkBtn.disabled = true;
       statusText.innerText = "お使いのブラウザは音声認識に対応していません。";
     }
 
-    // 天気コード解析
+    // 天気解析
     function parseWeatherCode(code) {
       if (code === 0) return "快晴";
       if (code <= 3) return "晴れ時々曇り";
@@ -459,20 +655,14 @@
       link.click();
     }
 
-    // 録画制御
+    // 録画
     function startRecording() {
       if (isRecording || !currentStream) return false;
       recordedChunks = [];
-      try {
-        mediaRecorder = new MediaRecorder(currentStream, { mimeType: 'video/webm' });
-      } catch (e) {
-        mediaRecorder = new MediaRecorder(currentStream);
-      }
+      try { mediaRecorder = new MediaRecorder(currentStream, { mimeType: 'video/webm' }); } 
+      catch (e) { mediaRecorder = new MediaRecorder(currentStream); }
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) recordedChunks.push(e.data);
-      };
-
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
       mediaRecorder.onstop = () => {
         const blob = new Blob(recordedChunks, { type: 'video/webm' });
         const url = URL.createObjectURL(blob);
@@ -494,9 +684,8 @@
       return true;
     }
 
-    // 拡張された多目的大規模物体辞書（カメラ検索機能の大幅強化）
+    // カメラ広範オブジェクト辞書
     const expandedObjectDB = {
-      // 日常用品・文房具・電子機器
       "cellular telephone": "スマートフォン", "cell phone": "スマートフォン", "mobile phone": "携帯電話",
       "laptop": "ノートパソコン", "desktop computer": "デスクトップPC", "computer keyboard": "キーボード",
       "mouse": "マウス", "remote control": "リモコン", "television": "テレビ・モニター",
@@ -504,34 +693,12 @@
       "book": "書籍", "notebook": "ノート", "pen": "ペン・筆記用具", "pencil": "鉛筆",
       "spectacles": "眼鏡", "sunglasses": "サングラス", "digital watch": "時計", "clock": "時計",
       "headphone": "ヘッドホン", "earphone": "イヤホン", "wallet": "財布", "backpack": "リュック・鞄",
-      "umbrella": "傘", "scissors": "ハサミ", "tissue": "ティッシュ",
-
-      // 衣類・身の回り品
-      "t-shirt": "Tシャツ", "jean": "ジーンズ", "shoe": "靴", "sneaker": "スニーカー",
-      "cap": "帽子", "coat": "コート・上着", "glove": "手袋", "sock": "靴下",
-
-      // 食品・飲み物
-      "apple": "リンゴ", "banana": "バナナ", "orange": "オレンジ", "bread": "パン",
-      "pizza": "ピザ", "sandwich": "サンドイッチ", "bottle": "ボトル", "plate": "お皿",
-
-      // 家具・室内
-      "chair": "椅子", "desk": "デスク・机", "table": "テーブル", "couch": "ソファ",
-      "bed": "ベッド", "lamp": "照明・ランプ", "door": "ドア・扉", "window": "窓",
-
-      // 動物・ペット
-      "dog": "犬", "cat": "猫", "bird": "鳥", "fish": "魚", "rabbit": "ウサギ",
-      "hamster": "ハムスター", "horse": "馬", "turtle": "カメ",
-
-      // 乗り物
-      "car": "自動車", "bicycle": "自転車", "motorcycle": "バイク", "bus": "バス",
-      "train": "電車", "airplane": "飛行機"
+      "umbrella": "傘", "scissors": "ハサミ", "tissue": "ティッシュ", "chair": "椅子", "desk": "デスク",
+      "dog": "犬", "cat": "猫", "car": "自動車", "bicycle": "自転車"
     };
 
-    // カメラ画像高度AI分析（「これ何？」で何でも多目的に識別）
     async function analyzeCurrentView() {
-      if (!aiVisionModel) {
-        aiVisionModel = await mobilenet.load();
-      }
+      if (!aiVisionModel) aiVisionModel = await mobilenet.load();
 
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth || 640;
@@ -543,93 +710,139 @@
 
       if (predictions && predictions.length > 0) {
         let detectedItems = [];
-        
         for (let p of predictions) {
           const rawName = p.className.toLowerCase();
           for (let key in expandedObjectDB) {
-            if (rawName.includes(key)) {
-              if (!detectedItems.includes(expandedObjectDB[key])) {
-                detectedItems.push(expandedObjectDB[key]);
-              }
+            if (rawName.includes(key) && !detectedItems.includes(expandedObjectDB[key])) {
+              detectedItems.push(expandedObjectDB[key]);
             }
           }
         }
-
         if (detectedItems.length > 0) {
-          return `スキャン完了。画面に写っているものは「${detectedItems.join('、または')}」の可能性が極めて高いです。`;
+          return `スキャン完了。画面に写っているものは「${detectedItems.join('、または')}」です。`;
         } else {
-          const firstName = predictions[0].className.split(',')[0];
-          return `アナライズ完了。対象物は「${firstName}」系の物体として識別されました。`;
+          return `アナライズ完了。対象物は「${predictions[0].className.split(',')[0]}」と識別されました。`;
         }
-      } else {
-        return "申し訳ありません。対象物を明確に検出できませんでした。もう少し近づけるか正面に向けてお試しください。";
       }
+      return "対象物を明確に検出できませんでした。";
     }
 
-    // 音声発声処理（文字表示より先に音声で応答を開始）
-    function speakResponse(replyText) {
+    // 日英翻訳処理
+    async function translateText(textToTranslate, targetLang = 'en') {
+      try {
+        const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(textToTranslate)}&langpair=ja|${targetLang}`);
+        const data = await res.json();
+        if (data && data.responseData) {
+          return data.responseData.translatedText;
+        }
+      } catch (e) {}
+      return null;
+    }
+
+    // 音声発話処理（文字表示より前に音声発声を先行開始）
+    function speakResponse(replyText, speakLang = 'ja-JP') {
       window.speechSynthesis.cancel();
+      isSpeaking = true;
+
+      // 喋る前に一時停止しピコン音・誤検知を完全ガード
+      if (recognition) {
+        try { recognition.stop(); } catch(e) {}
+      }
+
       const utterance = new SpeechSynthesisUtterance(replyText);
-      
-      if (availableVoices.length > 0) {
+      if (speakLang === 'ja-JP' && availableVoices.length > 0) {
         utterance.voice = availableVoices[currentVoiceIndex] || null;
       }
-      utterance.lang = 'ja-JP';
+      utterance.lang = speakLang;
       utterance.pitch = speechPitch;
       utterance.rate = 1.0;
 
-      // 音声再生開始と同時に（テキスト表示よりも先行して）文字更新と発声処理
-      utterance.onstart = () => {
-        statusText.innerText = `J.A.R.V.I.S.: 「${replyText}」`;
-        sendActiveNotification(replyText);
-        isSpeaking = true;
-      };
+      // テキスト表示と通知を先行/同時処理
+      statusText.innerText = `J.A.R.V.I.S.: 「${replyText}」`;
+      sendActiveNotification(replyText);
 
       utterance.onend = () => {
         isSpeaking = false;
+        if (isListening && recognition) {
+          setTimeout(() => { try { recognition.start(); } catch(e) {} }, 400);
+        }
       };
 
       utterance.onerror = () => {
         isSpeaking = false;
+        if (isListening && recognition) {
+          setTimeout(() => { try { recognition.start(); } catch(e) {} }, 400);
+        }
       };
 
-      // 即時に音声を発声開始
       window.speechSynthesis.speak(utterance);
     }
 
     // 3. 音声コマンド解析と実行
-    async function processCommand(input, recognition) {
+    async function processCommand(input) {
       const text = input.toLowerCase();
+
+      // タイトル画面でのデバイス音声選択
+      if (titleScreen.style.display !== 'none') {
+        if (text.includes("スマホ") || text.includes("スマートフォン")) {
+          selectDevice("スマホ");
+          return;
+        } else if (text.includes("タブレット")) {
+          selectDevice("タブレット");
+          return;
+        } else if (text.includes("pc") || text.includes("ピーシー") || text.includes("パソコン")) {
+          selectDevice("PC");
+          return;
+        }
+      }
+
       let reply = "";
 
-      // ライト（フラッシュライト）操作コマンド
-      if (text.includes("ライト") || text.includes("フラッシュ")) {
-        if (text.includes("つけ") || text.includes("オン") || text.includes("点灯") || text.includes("つけて")) {
+      // 翻訳コマンド
+      if (text.includes("翻訳") || text.includes("英語で") || text.includes("英語にし")) {
+        const query = text.replace(/(を英語にして|を英語に翻訳して|英語で|を翻訳して|って英語でなんていうの|って英語で何て言うの|翻訳|英語)/g, "").trim();
+        if (query) {
+          statusText.innerText = `「${query}」を翻訳中...`;
+          const translated = await translateText(query, 'en');
+          if (translated) {
+            reply = `「${query}」の英語訳は "${translated}" です、${getTitle()}。`;
+            speakResponse(reply, 'ja-JP');
+            return;
+          } else {
+            reply = `翻訳処理に失敗いたしました、${getTitle()}。`;
+          }
+        }
+      }
+      // ファイル操作コマンド
+      else if (text.includes("ファイル") && (text.includes("開") || text.includes("選択") || text.includes("表示"))) {
+        triggerFileInput();
+        reply = `ファイル選択ダイアログを開きます、${getTitle()}。`;
+      } else if (text.includes("ファイル") && (text.includes("消") || text.includes("閉") || text.includes("非表示"))) {
+        closeInScreen();
+        reply = `ファイルを閉じました、${getTitle()}。`;
+      }
+      // ライト操作コマンド
+      else if (text.includes("ライト") || text.includes("フラッシュ")) {
+        if (text.includes("つけ") || text.includes("オン") || text.includes("点灯")) {
           const success = await setTorch(true);
-          reply = success ? `カメラのライトを点灯しました、${getTitle()}。` : `申し訳ありません。このカメラデバイスはライト点灯に対応していないか、インカメラが選択されています。`;
-        } else if (text.includes("消") || text.includes("オフ") || text.includes("消して")) {
+          reply = success ? `カメラライトを点灯しました、${getTitle()}。` : `ライト制御に対応していないか、インカメラ選択中です。`;
+        } else if (text.includes("消") || text.includes("オフ")) {
           await setTorch(false);
           reply = `ライトを消灯いたしました、${getTitle()}。`;
         }
       }
-      // 声の変更・トーン操作コマンド
-      else if (text.includes("声を変え") || text.includes("声変更") || text.includes("声をチェンジ")) {
+      // 声変更
+      else if (text.includes("声を変え") || text.includes("声変更")) {
         switchVoice();
         return;
-      } else if (text.includes("声を高く")) {
-        speechPitch = 1.2;
-        reply = `音声を高めのトーンに変更いたしました、${getTitle()}。`;
-      } else if (text.includes("声を低く")) {
-        speechPitch = 0.6;
-        reply = `音声を低めのトーンに変更いたしました、${getTitle()}。`;
       }
-      // 画面表示消去コマンド
+      // 画面表示消去
       else if (text.includes("画面消") || text.includes("画面閉") || text.includes("閉じて") || text.includes("非表示")) {
         closeInScreen();
         reply = `画面表示を終了いたしました、${getTitle()}。`;
       }
-      // カメラ高度AI画像解析コマンド
-      else if (text.includes("これ何") || text.includes("これなに") || text.includes("これは何") || text.includes("映ってる") || text.includes("何が見える") || text.includes("調べて")) {
+      // カメラAI画像解析
+      else if (text.includes("これ何") || text.includes("これなに") || text.includes("映ってる") || text.includes("何が見える")) {
         try {
           reply = await analyzeCurrentView();
           reply += ` ${getTitle()}。`;
@@ -637,159 +850,88 @@
           reply = `解析中にエラーが発生しました、${getTitle()}。`;
         }
       }
-      // キャプチャコマンド
-      else if (text.includes("キャプチャ") || text.includes("スクショ") || text.includes("スクリーンショット") || text.includes("写真撮")) {
+      // キャプチャ
+      else if (text.includes("キャプチャ") || text.includes("スクショ") || text.includes("写真撮")) {
         takeScreenshot();
-        reply = `画面のキャプチャを完了し、保存いたしました、${getTitle()}。`;
+        reply = `画面のキャプチャを完了し保存いたしました、${getTitle()}。`;
       }
-      // 録画コマンド
+      // 録画
       else if (text.includes("録画")) {
         if (text.includes("開始") || text.includes("して") || text.includes("スタート")) {
-          if (startRecording()) {
-            reply = `ビデオ録画を開始いたしました、${getTitle()}。`;
-          } else {
-            reply = `録画を開始できませんでした、${getTitle()}。`;
-          }
+          reply = startRecording() ? `録画を開始いたしました、${getTitle()}。` : `録画を開始できませんでした。`;
         } else if (text.includes("停止") || text.includes("ストップ") || text.includes("終了")) {
-          if (stopRecording()) {
-            reply = `録画を停止し、ファイルを保存いたしました、${getTitle()}。`;
-          } else {
-            reply = `現在録画は実行されていません、${getTitle()}。`;
-          }
+          reply = stopRecording() ? `録画を停止し保存いたしました、${getTitle()}。` : `現在録画は実行されていません。`;
         }
       }
-      // 名前の登録
+      // 名前記憶
       else if (text.includes("名前は") || text.includes("呼んで")) {
-        let nameMatch = text.match(/(?:名前は|と呼んで|呼んで)(.+?)(?:だよ|です|にして|でお願い|$)/);
-        if (!nameMatch) {
-          nameMatch = text.match(/僕の名前は(.+)/) || text.match(/(.+)と呼んで/);
-        }
+        let nameMatch = text.match(/(?:名前は|と呼んで|呼んで)(.+?)(?:だよ|です|にして|$)/);
         if (nameMatch && nameMatch[1]) {
-          const extractedName = nameMatch[1].replace(/僕の|私の|は|と/g, '').trim();
-          if (extractedName) {
-            userName = extractedName;
-            localStorage.setItem('jarvis_userName', userName);
-            reply = `承知いたしました。お名前を「${userName}」として登録いたしました。これよりは${userName}様とお呼びいたします。`;
-          }
-        }
-        if (!reply) {
-          reply = `お名前の確認ができませんでした。もう一度おっしゃってください。`;
+          userName = nameMatch[1].replace(/僕の|私の|は|と/g, '').trim();
+          localStorage.setItem('jarvis_userName', userName);
+          reply = `お名前を「${userName}」として登録いたしました、${userName}様。`;
         }
       }
-      // バッテリー残量
+      // バッテリー
       else if (text.includes("充電") || text.includes("バッテリー") || text.includes("電池")) {
         if ('getBattery' in navigator) {
-          try {
-            const battery = await navigator.getBattery();
-            const level = Math.round(battery.level * 100);
-            const status = battery.charging ? "現在充電中です。" : "現在バッテリー駆動中です。";
-            reply = `現在のバッテリー残量は ${level}% です。${status}`;
-          } catch (e) {
-            reply = `バッテリー情報の取得に失敗しました、${getTitle()}。`;
-          }
-        } else {
-          reply = `お使いのブラウザはバッテリー取得に対応していません、${getTitle()}。`;
+          const battery = await navigator.getBattery();
+          const level = Math.round(battery.level * 100);
+          reply = `現在のバッテリー残量は ${level}% です、${getTitle()}。`;
         }
       }
-      // 天気情報
+      // 天気
       else if (text.includes("天気") || text.includes("予報")) {
         try {
           const response = await fetch("https://api.open-meteo.com/v1/forecast?latitude=35.6895&longitude=139.6917&current_weather=true");
           const data = await response.json();
-          const temp = Math.round(data.current_weather.temperature);
-          const condition = parseWeatherCode(data.current_weather.weathercode);
-          reply = `現在の気温は ${temp} 度、天気は ${condition} です、${getTitle()}。`;
-        } catch (e) {
-          reply = `天気の取得に失敗しました、${getTitle()}。`;
-        }
+          reply = `現在の気温は ${Math.round(data.current_weather.temperature)} 度、天気は ${parseWeatherCode(data.current_weather.weathercode)} です、${getTitle()}。`;
+        } catch (e) {}
       }
-      // Webアクセス
+      // WEBアクセス＆検索
       else if (text.includes("開いて") || text.includes("アクセス")) {
-        if (text.includes("youtube") || text.includes("ユーチューブ")) {
-          openInScreen("https://www.youtube.com");
-          reply = `YouTube を画面上に表示しました、${getTitle()}。`;
-        } else if (text.includes("google") || text.includes("グーグル")) {
-          openInScreen("https://www.google.com/search?igu=1");
-          reply = `Google 検索画面を表示しました、${getTitle()}。`;
-        } else if (text.includes("ニュース")) {
-          openInScreen("https://news.google.com");
-          reply = `最新ニュースを画面上に表示しました、${getTitle()}。`;
-        } else {
+        if (text.includes("youtube")) { openInScreen("https://www.youtube.com"); reply = `YouTubeを表示しました。`; }
+        else if (text.includes("google")) { openInScreen("https://www.google.com/search?igu=1"); reply = `Googleを表示しました。`; }
+        else {
           const target = text.replace(/(を開いて|にアクセスして|アクセス)/g, "").trim();
           openInScreen(`https://www.google.com/search?q=${encodeURIComponent(target)}&igu=1`);
-          reply = `${target} の検索結果を画面上に表示しました、${getTitle()}。`;
+          reply = `${target} の検索結果を表示しました。`;
         }
-      }
-      // 情報の検索
-      else if (text.includes("教えて") || text.includes("とは") || text.includes("検索")) {
+      } else if (text.includes("教えて") || text.includes("とは") || text.includes("検索")) {
         const query = text.replace(/(について教えて|とは|で検索|を検索|教えて)/g, "").trim();
         if (query) {
-          try {
-            const wikiRes = await fetch(`https://ja.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`);
-            if (wikiRes.ok) {
-              const wikiData = await wikiRes.json();
-              const summary = wikiData.extract ? wikiData.extract.substring(0, 80) : "";
-              reply = `${query} についての情報です。${summary}... 画面上に表示します、${getTitle()}。`;
-              openInScreen(wikiData.content_urls.desktop.page);
-            } else {
-              openInScreen(`https://www.google.com/search?q=${encodeURIComponent(query)}&igu=1`);
-              reply = `${query} の検索結果を画面上に表示します、${getTitle()}。`;
-            }
-          } catch(e) {
-            openInScreen(`https://www.google.com/search?q=${encodeURIComponent(query)}&igu=1`);
-            reply = `${query} の検索ページを画面上に表示しました、${getTitle()}。`;
-          }
+          openInScreen(`https://www.google.com/search?q=${encodeURIComponent(query)}&igu=1`);
+          reply = `${query} についての検索結果を画面上に表示しました、${getTitle()}。`;
         }
       }
       // 時刻・日付
-      else if (text.includes("時間") || text.includes("今何時") || text.includes("時刻")) {
+      else if (text.includes("時間") || text.includes("今何時")) {
         const now = new Date();
         reply = `現在は${now.getHours()}時${now.getMinutes()}分です、${getTitle()}。`;
       } else if (text.includes("日") || text.includes("今日") || text.includes("日付")) {
         const now = new Date();
-        const days = ["日", "月", "火", "水", "木", "金", "土"];
-        reply = `本日は${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日、${days[now.getDay()]}曜日です、${getTitle()}。`;
-      } 
+        reply = `本日は${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日です、${getTitle()}。`;
+      }
       // カメラ切替
       else if (text.includes("カメラ")) {
-        if (text.includes("イン") || text.includes("内") || text.includes("前")) {
-          initCamera('user');
-          reply = `インカメラに切り替えました、${getTitle()}。`;
-        } else if (text.includes("アウト") || text.includes("外") || text.includes("リア") || text.includes("後ろ")) {
-          initCamera('environment');
-          reply = `アウトカメラに切り替えました、${getTitle()}。`;
-        } else {
-          const nextMode = currentFacingMode === 'user' ? 'environment' : 'user';
-          initCamera(nextMode);
-          reply = nextMode === 'user' ? `インカメラに切り替えました、${getTitle()}。` : `アウトカメラに切り替えました、${getTitle()}。`;
-        }
-      } 
-      // コアの光制御
+        const nextMode = (text.includes("イン") || text.includes("前")) ? 'user' : 'environment';
+        initCamera(nextMode);
+        reply = `カメラを切り替えました、${getTitle()}。`;
+      }
+      // コアの光
       else if (text.includes("光") || text.includes("コア")) {
-        if (text.includes("消") || text.includes("オフ") || text.includes("切")) {
-          coreLight.classList.add('off');
-          reply = `中央コアの発光を停止しました、${getTitle()}。`;
-        } else if (text.includes("つけ") || text.includes("オン") || text.includes("点")) {
-          coreLight.classList.remove('off');
-          reply = `中央コアの発光を再開しました、${getTitle()}。`;
-        }
-      } 
-      // 呼び出しコマンド
+        if (text.includes("消") || text.includes("オフ")) { coreLight.classList.add('off'); reply = `コアの発光を停止しました。`; }
+        else if (text.includes("つけ") || text.includes("オン")) { coreLight.classList.remove('off'); reply = `コアの発光を再開しました。`; }
+      }
+      // 呼び出し
       else if (text.includes("ヘイ") || text.includes("hey") || text.includes("ジャービス") || text.includes("jarvis")) {
-        if (text.includes("こんにちは")) {
-          reply = `こんにちは、${getTitle()}。何かお手伝いできることはありますか？`;
-        } else {
-          reply = `はい、${getTitle()}。何でしょうか？`;
-        }
+        reply = `はい、${getTitle()}。何かお手伝いできることはありますか？`;
       }
 
-      // 返答の実行（文字表示より先に音声発声を開始）
       if (reply) {
         speakResponse(reply);
       }
     }
-
-    initCamera('user');
   </script>
 </body>
 </html>
